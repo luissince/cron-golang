@@ -1,19 +1,18 @@
 package main
 
 import (
-	// "github.com/go-co-op/gocron"
-
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mileusna/crontab"
+	"github.com/joho/godotenv"
 )
 
 type Comprobante struct {
@@ -54,11 +53,12 @@ type MessageWhatApp struct {
 }
 
 func getCpeAllDocuments() {
+    var url_server string = os.Getenv("URL_SERVER");
 
 	var comprobantes []Comprobante
 	var msgWhatApp []MessageWhatApp
 
-	res, err := http.Get("http://localhost:9000/app/controller/VentaController.php?type=listComprobantesExternal")
+	res, err := http.Get(url_server+"/app/controller/VentaController.php?type=listComprobantesExternal")
 	if err != nil {
 		sendWhatsAppMessageFail("No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.")
 		// sendWhatsAppMessageFail(strings.TrimSpace(string(err.Error())))
@@ -276,13 +276,14 @@ func automaticDeliveryVouchers(comp Comprobante, msgWA MessageWhatApp) MessageWh
 	var result Result
 	var error Error
 	var url string
+	var url_server string = os.Getenv("URL_SERVER");
 
 	if comp.Tipo == "v" {
-		url = "http://localhost:9000/app/examples/boleta.php?idventa="
+		url = url_server+"/app/examples/boleta.php?idventa="
 	} else if comp.Tipo == "gui" {
-		url = "http://localhost:9000/app/examples/guiaremision.php?idGuiaRemision="
+		url = url_server+"/app/examples/guiaremision.php?idGuiaRemision="
 	} else if comp.Tipo == "nc" {
-		url = "http://localhost:9000/app/examples/notacredito.php?idNotaCredito="
+		url = url_server+"/app/examples/notacredito.php?idNotaCredito="
 	}
 
 	res, err := http.Get(url + comp.IdComprobante)
@@ -398,17 +399,14 @@ func main() {
 
 	time.LoadLocation("America/Lima")
 
+	godotenv.Load();
+
+	var go_port string = os.Getenv("GO_PORT");
+
 	ctab := crontab.New()
 
-	err := ctab.AddJob("53 08 * * *", func() {
-		// b := []byte("Hola mundo!n")
-		// dt := time.Now()
-		// formattime := strconv.Itoa(dt.Hour()) +"-"+ strconv.Itoa(dt.Minute()) +"-"+ strconv.Itoa(dt.Second())
-		// err := ioutil.WriteFile(formattime+"-personal.txt", b, 0644)
-		// if err != nil {
-		// 	log.Fatal(err)
-
-		// go getCpeAllDocuments()
+	err := ctab.AddJob("53 08 * * *", func() {		
+		getCpeAllDocuments()
 	})
 
 	if err != nil {
@@ -419,31 +417,23 @@ func main() {
 
 	r := gin.Default()
 	r.GET("/ping", func(c *gin.Context) {
-		getCpeAllDocuments()
+		// getCpeAllDocuments()
 		c.JSON(http.StatusOK, gin.H{
 			"message": "pong",
 		})
 	})
-	r.Run("localhost:8080")
+
+	r.Run(go_port)
 }
 
-func task() {
-	b := []byte("Hola mundo!\n")
-	dt := time.Now()
-	// fob := dt.Format("15:04:05")
-	formattime := strconv.Itoa(dt.Hour()) + "-" + strconv.Itoa(dt.Minute()) + "-" + strconv.Itoa(dt.Second())
-	err := ioutil.WriteFile(formattime+"-personal.txt", b, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
+// func task() {
+// 	b := []byte("Hola mundo!\n")
+// 	dt := time.Now()
+// 	// fob := dt.Format("15:04:05")
+// 	formattime := strconv.Itoa(dt.Hour()) + "-" + strconv.Itoa(dt.Minute()) + "-" + strconv.Itoa(dt.Second())
+// 	err := ioutil.WriteFile(formattime+"-personal.txt", b, 0644)
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// }
 
-func myFunc() {
-	b := []byte("Hola mundo!\n")
-	dt := time.Now()
-	formattime := strconv.Itoa(dt.Hour()) + "-" + strconv.Itoa(dt.Minute()) + "-" + strconv.Itoa(dt.Second())
-	err := ioutil.WriteFile(formattime+"-personal.txt", b, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
