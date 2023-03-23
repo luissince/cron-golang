@@ -60,26 +60,29 @@ func getCpeAllDocuments() {
 
 	res, err := http.Get("http://localhost:9000/app/controller/VentaController.php?type=listComprobantesExternal")
 	if err != nil {
-
-		SendWhatsAppMessageFail("No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.")
-		// fmt.Println(string(err.Error()))
-		// SendWhatsAppMessageFail(strings.TrimSpace(string(err.Error())))
+		sendWhatsAppMessageFail("No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.")
+		// sendWhatsAppMessageFail(strings.TrimSpace(string(err.Error())))
 	} else {
 		defer res.Body.Close()
 
 		if res.StatusCode == 200 {
-
 			body, _ := ioutil.ReadAll(res.Body)
 			json.Unmarshal([]byte(body), &comprobantes)
 
-			msgWhatApp = validateAllDocuments(comprobantes)
-			SendWhatsAppMessage(msgWhatApp)
+			if len(comprobantes) > 0 {
+				msgWhatApp = sendAllDocuments(comprobantes)
+				var cadena string
+				for _, obj := range msgWhatApp {
+					cadena += fmt.Sprintf("   ---> %s %s %s", obj.Comprobante, obj.Estado, obj.Descripcion)
+				}
+				sendWhatsAppMessage(cadena)
+			}
 		}
 	}
 
 }
 
-func validateAllDocuments(comprobantes []Comprobante) []MessageWhatApp {
+func sendAllDocuments(comprobantes []Comprobante) []MessageWhatApp {
 
 	var msgWA MessageWhatApp
 	var arrayMsgWA []MessageWhatApp
@@ -87,13 +90,10 @@ func validateAllDocuments(comprobantes []Comprobante) []MessageWhatApp {
 	for _, comp := range comprobantes {
 
 		if comp.Tipo == "v" {
-			// fmt.Println("entro a bolata y factura")
 			arrayMsgWA = append(arrayMsgWA, validateBolateFactura(comp, msgWA))
 		} else if comp.Tipo == "gui" {
-			// fmt.Println("entro a guia")
 			arrayMsgWA = append(arrayMsgWA, validateGuia(comp, msgWA))
 		} else if comp.Tipo == "nc" {
-			// fmt.Println("entro a nota de credito")
 			arrayMsgWA = append(arrayMsgWA, validateNotaCredito(comp, msgWA))
 		}
 	}
@@ -104,29 +104,29 @@ func validateAllDocuments(comprobantes []Comprobante) []MessageWhatApp {
 func validateBolateFactura(comp Comprobante, msgWA MessageWhatApp) MessageWhatApp {
 
 	if comp.Xmlsunat == "0" {
-		msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+		msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 		msgWA.Estado = "COMPROBANTE ACEPTADO"
 		msgWA.Descripcion = "El comprobante ya fue aceptado"
 
 	} else if comp.Xmlsunat == "1033" {
-		msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+		msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 		msgWA.Estado = "COMPROBANTE ACEPTADO"
 		msgWA.Descripcion = "El comprobante aceptado ya no se puede declarar mas de 2 veces"
 
 	} else if len(comp.Serie) != 4 {
-		msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+		msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 		msgWA.Estado = "CORREGIR"
 		msgWA.Descripcion = "La serie no cumple con el número de caracteres establecido"
 
 	} else if comp.CodigoComprobante == "03" { // CODIGO DE BOLETA = 03
 
 		if !strings.HasPrefix(strings.ToUpper(comp.Serie), "B") {
-			msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+			msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 			msgWA.Estado = "CORREGIR"
 			msgWA.Descripcion = "La serie no cumple con el formato de facturación"
 
 		} else if len(comp.NumeroDocumento) != 8 {
-			msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+			msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 			msgWA.Estado = "CORREGIR"
 			msgWA.Descripcion = "El número de documento no cumple con el número de caracteres establecido"
 
@@ -135,20 +135,21 @@ func validateBolateFactura(comp Comprobante, msgWA MessageWhatApp) MessageWhatAp
 			msgWA = automaticDeliveryVouchers(comp, msgWA)
 
 		} else {
-			msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+			msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 			msgWA.Estado = "CORREGIR"
 			msgWA.Descripcion = "El codigo de documento es incorrecto"
 
 		}
 
 	} else if comp.CodigoComprobante == "01" { // Codigo de Factura = 01
+
 		if !strings.HasPrefix(strings.ToUpper(comp.Serie), "F") {
-			msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+			msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 			msgWA.Estado = "CORREGIR"
 			msgWA.Descripcion = "La serie no cumple con el formato de facturación"
 
 		} else if len(comp.NumeroDocumento) != 11 {
-			msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+			msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 			msgWA.Estado = "CORREGIR"
 			msgWA.Descripcion = "El número de documento no cumple con el número de caracteres establecido"
 
@@ -157,12 +158,13 @@ func validateBolateFactura(comp Comprobante, msgWA MessageWhatApp) MessageWhatAp
 			msgWA = automaticDeliveryVouchers(comp, msgWA)
 
 		} else {
-			msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+			msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 			msgWA.Estado = "CORREGIR"
 			msgWA.Descripcion = "El codigo de documento es incorrecto"
 		}
+
 	} else {
-		msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+		msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 		msgWA.Estado = "CORREGIR"
 		msgWA.Descripcion = "El codigo de comprobante es incorrecto"
 
@@ -174,29 +176,29 @@ func validateBolateFactura(comp Comprobante, msgWA MessageWhatApp) MessageWhatAp
 func validateGuia(comp Comprobante, msgWA MessageWhatApp) MessageWhatApp {
 
 	if comp.Xmlsunat == "0" {
-		msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+		msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 		msgWA.Estado = "COMPROBANTE ACEPTADO"
 		msgWA.Descripcion = "El comprobante ya fue enviado"
 
 	} else if comp.Xmlsunat == "1033" {
-		msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+		msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 		msgWA.Estado = "COMPROBANTE ACEPTADO"
 		msgWA.Descripcion = "El comprobante aceptado ya no se puede declarar mas de 2 veces"
 
 	} else if len(comp.Serie) != 4 {
-		msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+		msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 		msgWA.Estado = "CORREGIR"
 		msgWA.Descripcion = "La serie no cumple con el número de caracteres establecido"
 
 	} else if comp.CodigoComprobante == "09" {
 
 		if !strings.HasPrefix(strings.ToUpper(comp.Serie), "T") {
-			msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+			msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 			msgWA.Estado = "CORREGIR"
 			msgWA.Descripcion = "La serie no cumple con el formato de facturación"
 
 		} else if len(comp.NumeroDocumento) != 11 && len(comp.NumeroDocumento) != 8 {
-			msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+			msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 			msgWA.Estado = "CORREGIR"
 			msgWA.Descripcion = "El número de documento no cumple con el número de caracteres establecido"
 
@@ -204,48 +206,48 @@ func validateGuia(comp Comprobante, msgWA MessageWhatApp) MessageWhatApp {
 			msgWA = automaticDeliveryVouchers(comp, msgWA)
 
 		} else {
-			msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+			msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 			msgWA.Estado = "CORREGIR"
 			msgWA.Descripcion = "El codigo de documento es incorrecto"
 
 		}
 
 	} else {
-		msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+		msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 		msgWA.Estado = "CORREGIR"
 		msgWA.Descripcion = "El codigo de comprobante es incorrecto"
 
 	}
 
 	return msgWA
-
 }
 
 func validateNotaCredito(comp Comprobante, msgWA MessageWhatApp) MessageWhatApp {
+
 	if comp.Xmlsunat == "0" {
-		msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+		msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 		msgWA.Estado = "COMPROBANTE ACEPTADO"
 		msgWA.Descripcion = "El comprobante ya fue enviado"
 
 	} else if comp.Xmlsunat == "1033" {
-		msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+		msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 		msgWA.Estado = "COMPROBANTE ACEPTADO"
 		msgWA.Descripcion = "El comprobante aceptado ya no se puede declarar mas de 2 veces"
 
 	} else if len(comp.Serie) != 4 {
-		msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+		msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 		msgWA.Estado = "CORREGIR"
 		msgWA.Descripcion = "La serie no cumple con el número de caracteres establecido"
 
 	} else if comp.CodigoComprobante == "07" {
 
-		if !strings.HasPrefix(strings.ToUpper(comp.Serie), "BN") || !strings.HasPrefix(strings.ToUpper(comp.Serie), "FN") {
-			msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+		if !strings.HasPrefix(strings.ToUpper(comp.Serie), "BN") && !strings.HasPrefix(strings.ToUpper(comp.Serie), "FN") {
+			msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 			msgWA.Estado = "CORREGIR"
 			msgWA.Descripcion = "La serie no cumple con el formato de facturación"
 
 		} else if len(comp.NumeroDocumento) != 11 && len(comp.NumeroDocumento) != 8 {
-			msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+			msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 			msgWA.Estado = "CORREGIR"
 			msgWA.Descripcion = "El número de documento no cumple con el número de caracteres establecido"
 
@@ -253,13 +255,14 @@ func validateNotaCredito(comp Comprobante, msgWA MessageWhatApp) MessageWhatApp 
 			msgWA = automaticDeliveryVouchers(comp, msgWA)
 
 		} else {
-			msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+			msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 			msgWA.Estado = "CORREGIR"
 			msgWA.Descripcion = "El codigo de documento es incorrecto"
 
 		}
+
 	} else {
-		msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+		msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 		msgWA.Estado = "CORREGIR"
 		msgWA.Descripcion = "El codigo de comprobante es incorrecto"
 
@@ -269,9 +272,9 @@ func validateNotaCredito(comp Comprobante, msgWA MessageWhatApp) MessageWhatApp 
 }
 
 func automaticDeliveryVouchers(comp Comprobante, msgWA MessageWhatApp) MessageWhatApp {
+
 	var result Result
 	var error Error
-
 	var url string
 
 	if comp.Tipo == "v" {
@@ -284,20 +287,22 @@ func automaticDeliveryVouchers(comp Comprobante, msgWA MessageWhatApp) MessageWh
 
 	res, err := http.Get(url + comp.IdComprobante)
 	if err != nil {
-		msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+		msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 		msgWA.Estado = "ERROR"
 		msgWA.Descripcion = "No se pudo conectar al servidor para el envio de comprobantes"
 	} else {
+		defer res.Body.Close()
+
 		if res.StatusCode == 200 {
 			body, _ := ioutil.ReadAll(res.Body)
 			json.Unmarshal([]byte(body), &result)
 
 			if result.State && result.Accept {
-				msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+				msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 				msgWA.Estado = "ENVIADO"
 				msgWA.Descripcion = result.Description
 			} else {
-				msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+				msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 				msgWA.Estado = "CORREGIR"
 				msgWA.Descripcion = result.Description
 			}
@@ -305,17 +310,16 @@ func automaticDeliveryVouchers(comp Comprobante, msgWA MessageWhatApp) MessageWh
 			body, _ := ioutil.ReadAll(res.Body)
 			json.Unmarshal([]byte(body), &error)
 
-			msgWA.Comprobante = comp.Serie + " - " + comp.Numeracion
+			msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 			msgWA.Estado = "ADVERTENCIA"
 			msgWA.Descripcion = error.Message
 		}
 	}
-	defer res.Body.Close()
 
 	return msgWA
 }
 
-func SendWhatsAppMessage(msgWA []MessageWhatApp) {
+func sendWhatsAppMessage(msgWA string) {
 
 	url := "https://graph.facebook.com/v16.0/114181978288370/messages"
 
@@ -331,31 +335,30 @@ func SendWhatsAppMessage(msgWA []MessageWhatApp) {
 	}`
 
 	payload := strings.NewReader(fmt.Sprintf(message, msgWA))
-
 	req, _ := http.NewRequest("POST", url, payload)
 
 	req.Header.Add("Content-Type", "application/json")
-	// req.Header.Add("User-Agent", "Thunder Client (https://www.thunderclient.com)")
-	req.Header.Add("Authorization", "Bearer EAAK4CE2kFXABAIEFULbpUAwiULtNctynSB8hyqz0Rzd6KNdYaV9HjeosDDFVKyEah5KAZCwnyTDMDyj8s6mK5089lH4FAz6BawuIPzoOzUDr1JSCxmXQZAQQFUZBFUQJvFWK6VGeKzWa84lubC5PNiaj6m5HwCE34Ip3ugrFiO46f9ytm6rx8zer8pgITQK3gmiZAzTCKAZDZD")
+	req.Header.Add("Authorization", "Bearer EAAK4CE2kFXABABuxeQeEjEJFWe08nHlw0RDIEyIX2SyJjvTW0NPiQAdCaKxOkKjZCOQ0ALI6iDrTZBa8WXoT5kA1WjZBDTa6lkHZCqcHjOgghxQ8RDy9jWUm6thtLSYauG2nxS16HOgGOSVDpxSwxjxxPo9ujVZC2uaDP9P2wkHzvCSHw3Am6go3aoesQ6P8wjbQjehmjiQZDZD")
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		fmt.Println("Error de envio de mensaje por whatsapp")
-	}
-	defer res.Body.Close()
-
-	fmt.Println(res.Status)
-
-	if res.StatusCode == http.StatusOK {
-
+		fmt.Println(err.Error())
 	} else {
-		body, _ := ioutil.ReadAll(res.Body)
-		message := strings.TrimSpace(string(body))
-		fmt.Println(message)
+		defer res.Body.Close()
+
+		if res.StatusCode == http.StatusOK {
+			fmt.Println(res.Status)
+		} else {
+			// fmt.Printf("%s", msgWA)
+			body, _ := ioutil.ReadAll(res.Body)
+			message := strings.TrimSpace(string(body))
+			fmt.Println(message)
+		}
 	}
+
 }
 
-func SendWhatsAppMessageFail(msg string) {
+func sendWhatsAppMessageFail(msg string) {
 	url := "https://graph.facebook.com/v16.0/114181978288370/messages"
 
 	message := `{
@@ -368,29 +371,27 @@ func SendWhatsAppMessageFail(msg string) {
 			"body": "%s"
 		}
 	}`
-	payload := strings.NewReader(fmt.Sprintf(message, msg))
 
+	payload := strings.NewReader(fmt.Sprintf(message, msg))
 	req, _ := http.NewRequest("POST", url, payload)
 
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", "Bearer EAAK4CE2kFXABAIEFULbpUAwiULtNctynSB8hyqz0Rzd6KNdYaV9HjeosDDFVKyEah5KAZCwnyTDMDyj8s6mK5089lH4FAz6BawuIPzoOzUDr1JSCxmXQZAQQFUZBFUQJvFWK6VGeKzWa84lubC5PNiaj6m5HwCE34Ip3ugrFiO46f9ytm6rx8zer8pgITQK3gmiZAzTCKAZDZD")
+	req.Header.Add("Authorization", "Bearer EAAK4CE2kFXABABuxeQeEjEJFWe08nHlw0RDIEyIX2SyJjvTW0NPiQAdCaKxOkKjZCOQ0ALI6iDrTZBa8WXoT5kA1WjZBDTa6lkHZCqcHjOgghxQ8RDy9jWUm6thtLSYauG2nxS16HOgGOSVDpxSwxjxxPo9ujVZC2uaDP9P2wkHzvCSHw3Am6go3aoesQ6P8wjbQjehmjiQZDZD")
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		fmt.Println("Error de envio de mensaje por whatsapp")
-	}
-	defer res.Body.Close()
-
-	fmt.Println(res.Status)
-
-	if res.StatusCode == http.StatusOK {
-
 	} else {
-		body, _ := ioutil.ReadAll(res.Body)
-		message := strings.TrimSpace(string(body))
-		fmt.Println(message)
-	}
+		defer res.Body.Close()
 
+		if res.StatusCode == http.StatusOK {
+			fmt.Println(res.Status)
+		} else {
+			body, _ := ioutil.ReadAll(res.Body)
+			message := strings.TrimSpace(string(body))
+			fmt.Println(message)
+		}
+	}
 }
 
 func main() {
@@ -400,7 +401,6 @@ func main() {
 	ctab := crontab.New()
 
 	err := ctab.AddJob("53 08 * * *", func() {
-		// fmt.Println("Job")
 		// b := []byte("Hola mundo!n")
 		// dt := time.Now()
 		// formattime := strconv.Itoa(dt.Hour()) +"-"+ strconv.Itoa(dt.Minute()) +"-"+ strconv.Itoa(dt.Second())
