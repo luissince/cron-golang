@@ -6,13 +6,13 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
-	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mileusna/crontab"
 	"github.com/joho/godotenv"
+	"github.com/mileusna/crontab"
 )
 
 type Comprobante struct {
@@ -53,12 +53,12 @@ type MessageWhatApp struct {
 }
 
 func getCpeAllDocuments() {
-    var url_server string = os.Getenv("URL_SERVER");
+	var url_server string = os.Getenv("URL_SERVER")
 
 	var comprobantes []Comprobante
 	var msgWhatApp []MessageWhatApp
 
-	res, err := http.Get(url_server+"/app/controller/VentaController.php?type=listComprobantesExternal")
+	res, err := http.Get(url_server + "/app/controller/VentaController.php?type=listComprobantesExternal")
 	if err != nil {
 		sendWhatsAppMessageFail("No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.")
 		// sendWhatsAppMessageFail(strings.TrimSpace(string(err.Error())))
@@ -83,7 +83,6 @@ func getCpeAllDocuments() {
 }
 
 func sendAllDocuments(comprobantes []Comprobante) []MessageWhatApp {
-
 	var msgWA MessageWhatApp
 	var arrayMsgWA []MessageWhatApp
 
@@ -102,7 +101,6 @@ func sendAllDocuments(comprobantes []Comprobante) []MessageWhatApp {
 }
 
 func validateBolateFactura(comp Comprobante, msgWA MessageWhatApp) MessageWhatApp {
-
 	if comp.Xmlsunat == "0" {
 		msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 		msgWA.Estado = "COMPROBANTE ACEPTADO"
@@ -174,7 +172,6 @@ func validateBolateFactura(comp Comprobante, msgWA MessageWhatApp) MessageWhatAp
 }
 
 func validateGuia(comp Comprobante, msgWA MessageWhatApp) MessageWhatApp {
-
 	if comp.Xmlsunat == "0" {
 		msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 		msgWA.Estado = "COMPROBANTE ACEPTADO"
@@ -223,7 +220,6 @@ func validateGuia(comp Comprobante, msgWA MessageWhatApp) MessageWhatApp {
 }
 
 func validateNotaCredito(comp Comprobante, msgWA MessageWhatApp) MessageWhatApp {
-
 	if comp.Xmlsunat == "0" {
 		msgWA.Comprobante = comp.Serie + "-" + comp.Numeracion
 		msgWA.Estado = "COMPROBANTE ACEPTADO"
@@ -272,18 +268,17 @@ func validateNotaCredito(comp Comprobante, msgWA MessageWhatApp) MessageWhatApp 
 }
 
 func automaticDeliveryVouchers(comp Comprobante, msgWA MessageWhatApp) MessageWhatApp {
-
 	var result Result
 	var error Error
 	var url string
-	var url_server string = os.Getenv("URL_SERVER");
+	var url_server string = os.Getenv("URL_SERVER")
 
 	if comp.Tipo == "v" {
-		url = url_server+"/app/examples/boleta.php?idventa="
+		url = url_server + "/app/examples/boleta.php?idventa="
 	} else if comp.Tipo == "gui" {
-		url = url_server+"/app/examples/guiaremision.php?idGuiaRemision="
+		url = url_server + "/app/examples/guiaremision.php?idGuiaRemision="
 	} else if comp.Tipo == "nc" {
-		url = url_server+"/app/examples/notacredito.php?idNotaCredito="
+		url = url_server + "/app/examples/notacredito.php?idNotaCredito="
 	}
 
 	res, err := http.Get(url + comp.IdComprobante)
@@ -321,7 +316,6 @@ func automaticDeliveryVouchers(comp Comprobante, msgWA MessageWhatApp) MessageWh
 }
 
 func sendWhatsAppMessage(msgWA string) {
-
 	url := "https://graph.facebook.com/v16.0/114181978288370/messages"
 
 	message := `{
@@ -399,13 +393,13 @@ func main() {
 
 	time.LoadLocation("America/Lima")
 
-	godotenv.Load();
+	godotenv.Load()
 
-	var go_port string = os.Getenv("GO_PORT");
+	var go_port string = os.Getenv("GO_PORT")
 
 	ctab := crontab.New()
 
-	err := ctab.AddJob("53 08 * * *", func() {		
+	err := ctab.AddJob("53 08 * * *", func() {
 		getCpeAllDocuments()
 	})
 
@@ -416,6 +410,10 @@ func main() {
 	// ctab.MustAddJob("* * * * *", myFunc)
 
 	r := gin.Default()
+
+	// Middleware para CORS
+	r.Use(corsMiddleware())
+
 	r.GET("/ping", func(c *gin.Context) {
 		// getCpeAllDocuments()
 		c.JSON(http.StatusOK, gin.H{
@@ -424,6 +422,16 @@ func main() {
 	})
 
 	r.Run(go_port)
+}
+
+func corsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
+		c.Writer.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		c.Next()
+	}
 }
 
 // func task() {
@@ -436,4 +444,3 @@ func main() {
 // 		log.Fatal(err)
 // 	}
 // }
-
